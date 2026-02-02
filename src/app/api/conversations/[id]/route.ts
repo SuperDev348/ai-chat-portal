@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import mongoose from "mongoose";
+import { unlinkSync, existsSync } from "fs";
+import { join } from "path";
 import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/db";
 import { Conversation } from "@/lib/models/Conversation";
 import { Message } from "@/lib/models/Message";
+import { StoredFile } from "@/lib/models/StoredFile";
 
 export async function GET(
   _request: Request,
@@ -39,6 +42,13 @@ export async function GET(
         id: m._id.toString(),
         role: m.role,
         content: m.content,
+        attachments: Array.isArray(m.attachments)
+          ? m.attachments.map((a: { type?: string; url?: string; name?: string }) => ({
+              type: a.type ?? "image",
+              url: a.url ?? "",
+              name: a.name,
+            }))
+          : [],
         createdAt: m.createdAt.toISOString(),
       })),
     });
@@ -114,6 +124,19 @@ export async function DELETE(
     if (!conv) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+    const storedFiles = await StoredFile.find({ conversationId: id }).lean();
+    const uploadsDir = join(process.cwd(), "uploads");
+    for (const f of storedFiles) {
+      const filePath = join(uploadsDir, f.path);
+      if (existsSync(filePath)) {
+        try {
+          unlinkSync(filePath);
+        } catch {
+          // ignore
+        }
+      }
+    }
+    await StoredFile.deleteMany({ conversationId: id });
     await Message.deleteMany({ conversationId: id });
     return NextResponse.json({ ok: true });
   } catch (e) {

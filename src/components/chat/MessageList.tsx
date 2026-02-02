@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { DownloadIcon, SpeakerIcon, ThumbUpIcon, ThumbDownIcon } from "@/components/icons";
 
@@ -11,18 +12,51 @@ function CopyIcon({ className }: { className?: string }) {
   );
 }
 
+export interface MessageAttachment {
+  type: "image" | "file";
+  url: string;
+  name?: string;
+}
+
 export interface Message {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
+  attachments?: MessageAttachment[];
   createdAt: string;
 }
 
 export function MessageList({ messages }: { messages: Message[] }) {
   const { data: session } = useSession();
+  const [fullImageUrl, setFullImageUrl] = useState<string | null>(null);
 
   return (
     <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-6">
+      {fullImageUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setFullImageUrl(null)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === "Escape" && setFullImageUrl(null)}
+          aria-label="Close full image"
+        >
+          <button
+            type="button"
+            className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+            onClick={() => setFullImageUrl(null)}
+            aria-label="Close"
+          >
+            <span className="text-xl">×</span>
+          </button>
+          <img
+            src={fullImageUrl}
+            alt="Full size"
+            className="max-h-full max-w-full rounded-lg object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
       {messages.length === 0 && (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
           <p className="text-xl font-semibold text-slate-800 dark:text-slate-200">
@@ -41,9 +75,51 @@ export function MessageList({ messages }: { messages: Message[] }) {
           {m.role === "user" ? (
             <>
               <div className="max-w-[75%] rounded-2xl rounded-tr-md bg-slate-200 px-4 py-2.5 dark:bg-slate-600">
-                <p className="whitespace-pre-wrap break-words text-sm text-slate-800 dark:text-slate-100">
-                  {m.content}
-                </p>
+                {m.content !== "[Image(s) attached]" && (
+                  <p className="whitespace-pre-wrap break-words text-sm text-slate-800 dark:text-slate-100">
+                    {m.content}
+                  </p>
+                )}
+                {m.attachments && m.attachments.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {m.attachments.map((att, i) =>
+                      att.type === "image" ? (
+                        <div key={i} className="flex flex-col items-start gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setFullImageUrl(att.url)}
+                            className="overflow-hidden rounded-lg border border-slate-300 shadow-sm transition hover:opacity-90 dark:border-slate-500"
+                            aria-label="View full image"
+                          >
+                            <img
+                              src={att.url}
+                              alt={att.name ?? "Attachment"}
+                              className="h-20 w-20 object-cover"
+                            />
+                          </button>
+                          <a
+                            href={`${att.url}?download=1`}
+                            download={att.name ?? "image"}
+                            className="text-xs text-teal-600 hover:underline dark:text-teal-400"
+                          >
+                            Download
+                          </a>
+                        </div>
+                      ) : (
+                        <a
+                          key={i}
+                          href={`${att.url}?download=1`}
+                          download={att.name ?? "file"}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-lg border border-slate-300 bg-slate-100 px-2 py-1 text-xs text-slate-700 hover:bg-slate-200 dark:border-slate-500 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
+                        >
+                          {att.name ?? "File"} (download)
+                        </a>
+                      )
+                    )}
+                  </div>
+                )}
               </div>
               <div className="shrink-0">
                 {session?.user?.image ? (

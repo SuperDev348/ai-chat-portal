@@ -23,6 +23,7 @@ export default function ChatPage() {
   const id = typeof params.id === "string" ? params.id : null;
   const queryClient = useQueryClient();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   const {
     data: conversation,
@@ -46,6 +47,48 @@ export default function ChatPage() {
     refetchInterval: REFETCH_INTERVAL,
   });
 
+  function applyMessageSuccess(data: {
+    id?: string;
+    role?: string;
+    content?: string;
+    createdAt?: string;
+    attachments?: { type: string; url: string; name?: string }[];
+    assistantMessage?: { id: string; role: string; content: string; createdAt: string };
+    error?: string;
+  }) {
+    setSendError(data?.error ?? null);
+    if (id && data?.assistantMessage && data?.id) {
+      queryClient.setQueryData(
+        ["conversation", id],
+        (prev: { id: string; title: string; messages: Message[] } | undefined) => {
+          if (!prev) return prev;
+          const existingIds = new Set((prev.messages ?? []).map((m) => m.id));
+          const userMsg = {
+            id: data.id!,
+            role: data.role ?? "user",
+            content: data.content ?? "",
+            attachments: data.attachments ?? [],
+            createdAt: data.createdAt ?? new Date().toISOString(),
+          };
+          const assistantMsg = {
+            id: data.assistantMessage!.id,
+            role: data.assistantMessage!.role,
+            content: data.assistantMessage!.content,
+            createdAt: data.assistantMessage!.createdAt,
+          };
+          const toAppend = [userMsg, assistantMsg].filter((m) => !existingIds.has(m.id));
+          if (toAppend.length === 0) return prev;
+          return {
+            ...prev,
+            messages: [...(prev.messages ?? []), ...toAppend],
+          };
+        }
+      );
+    }
+    if (id) queryClient.invalidateQueries({ queryKey: ["conversation", id] });
+    queryClient.invalidateQueries({ queryKey: ["conversations"] });
+  }
+
   const sendMutation = useMutation({
     mutationFn: async (content: string) => {
       if (!id) throw new Error("No conversation");
@@ -58,10 +101,40 @@ export default function ChatPage() {
       if (!res.ok) throw new Error("Failed to send");
       return res.json();
     },
-    onSuccess: () => {
-      if (id) queryClient.invalidateQueries({ queryKey: ["conversation", id] });
-      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    onSuccess: applyMessageSuccess,
+  });
+
+  const sendWithAttachmentsMutation = useMutation({
+    mutationFn: async ({ content, files }: { content: string; files: File[] }) => {
+      if (!id) throw new Error("No conversation");
+      const form = new FormData();
+      form.append("content", content);
+      files.forEach((f) => form.append("images", f));
+      const res = await fetch(`/api/conversations/${id}/messages`, {
+        method: "POST",
+        body: form,
+      });
+      if (res.status === 401) throw new Error("Unauthorized");
+      if (!res.ok) throw new Error("Failed to send");
+      return res.json();
     },
+    onSuccess: applyMessageSuccess,
+  });
+
+  const sendAudioMutation = useMutation({
+    mutationFn: async (audioBlob: Blob) => {
+      if (!id) throw new Error("No conversation");
+      const form = new FormData();
+      form.append("audio", audioBlob, "audio.webm");
+      const res = await fetch(`/api/conversations/${id}/audio`, {
+        method: "POST",
+        body: form,
+      });
+      if (res.status === 401) throw new Error("Unauthorized");
+      if (!res.ok) throw new Error("Failed to send");
+      return res.json();
+    },
+    onSuccess: applyMessageSuccess,
   });
 
   useEffect(() => {
@@ -136,10 +209,30 @@ export default function ChatPage() {
         ) : conversation ? (
           <>
             <MessageList messages={conversation.messages ?? []} />
+            {sendError && (
+              <div className="px-4 py-2 text-center text-sm text-amber-600 dark:text-amber-400">
+                {sendError}
+              </div>
+            )}
             <UnlockFeaturesCard />
             <ChatInput
-              onSend={(content) => sendMutation.mutate(content)}
-              disabled={sendMutation.isPending}
+              onSend={(content) => {
+                setSendError(null);
+                sendMutation.mutate(content);
+              }}
+              onSendWithAttachments={(content, files) => {
+                setSendError(null);
+                sendWithAttachmentsMutation.mutate({ content, files });
+              }}
+              onSendAudio={(audioBlob) => {
+                setSendError(null);
+                sendAudioMutation.mutate(audioBlob);
+              }}
+              disabled={
+                sendMutation.isPending ||
+                sendWithAttachmentsMutation.isPending ||
+                sendAudioMutation.isPending
+              }
             />
           </>
         ) : null}
