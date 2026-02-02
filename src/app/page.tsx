@@ -1,12 +1,25 @@
-export default function Home() {
+"use client";
+
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+
+export default function HomePage() {
+  const { status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === "loading") return;
+    if (status === "authenticated") {
+      router.replace("/chat");
+    } else {
+      router.replace("/login");
+    }
+  }, [status, router]);
+
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-8">
-      <h1 className="text-4xl font-bold text-gray-900 dark:text-white">
-        AI Chat Portal
-      </h1>
-      <p className="mt-4 text-lg text-gray-600 dark:text-gray-300">
-        Welcome to your Next.js TypeScript project.
-      </p>
-    </main>
+    <div className="flex min-h-screen items-center justify-center bg-slate-100 dark:bg-slate-950">
+      <p className="text-sm text-slate-500">Redirecting…</p>
+    </div>
   );
 }

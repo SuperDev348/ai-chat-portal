@@ -1,0 +1,23 @@
+import mongoose, { Schema, type Model } from "mongoose";
+
+export interface IConversation {
+  _id: mongoose.Types.ObjectId;
+  userId: mongoose.Types.ObjectId;
+  title: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const ConversationSchema = new Schema<IConversation>(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    title: { type: String, default: "New chat" },
+  },
+  { timestamps: true }
+);
+
+ConversationSchema.index({ userId: 1, updatedAt: -1 });
+
+export const Conversation: Model<IConversation> =
+  mongoose.models.Conversation ??
+  mongoose.model<IConversation>("Conversation", ConversationSchema);
