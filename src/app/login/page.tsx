@@ -29,13 +29,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(
-    errorParam === "CredentialsSignin"
-      ? "Invalid email or password."
-      : errorParam === "SessionRequired"
-        ? "Please sign in to continue."
-        : null
-  );
+  const [error, setError] = useState<string | null>(() => {
+    if (errorParam === "CredentialsSignin") return "Invalid email or password.";
+    if (errorParam === "SessionRequired") return "Please sign in to continue.";
+    if (errorParam === "OAuthAccountNotLinked") return "This email is already linked to another sign-in method.";
+    if (errorParam) return "Sign-in failed. Try again or use another method.";
+    return null;
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -235,7 +235,7 @@ export default function LoginPage() {
             </button>
             <button
               type="button"
-              onClick={() => signIn("apple", { callbackUrl }).catch(() => {})}
+              onClick={() => handleOAuth("apple")}
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               <AppleIcon className="h-5 w-5" /> Continue With Apple
