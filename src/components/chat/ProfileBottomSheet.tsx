@@ -2,14 +2,18 @@
 
 import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import {
   PencilIcon,
   CreditCardIcon,
   LockIcon,
+  TrashIcon,
   LogOutIcon,
 } from "@/components/icons";
 import { CloseIcon } from "@/components/icons";
 import { LogOutModal } from "./LogOutModal";
+import { ChangePasswordModal } from "./ChangePasswordModal";
+import { DeleteAccountModal } from "./DeleteAccountModal";
 
 export function ProfileBottomSheet({
   open,
@@ -19,7 +23,10 @@ export function ProfileBottomSheet({
   onClose: () => void;
 }) {
   const { data: session } = useSession();
+  const router = useRouter();
   const [showLogOutModal, setShowLogOutModal] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
 
   useEffect(() => {
     if (open) document.body.style.overflow = "hidden";
@@ -38,14 +45,46 @@ export function ProfileBottomSheet({
     signOut({ callbackUrl: "/login" });
   };
 
+  const openEditProfile = () => {
+    onClose();
+    router.push("/profile/edit");
+  };
+
+  const openChangePassword = () => {
+    onClose();
+    setShowChangePasswordModal(true);
+  };
+
+  const openDeleteAccount = () => {
+    onClose();
+    setShowDeleteAccountModal(true);
+  };
+
   if (!open) {
-    return showLogOutModal ? (
-      <LogOutModal
-        open={true}
-        onClose={() => setShowLogOutModal(false)}
-        onConfirm={confirmLogOut}
-      />
-    ) : null;
+    return (
+      <>
+        {showLogOutModal && (
+          <LogOutModal
+            open={true}
+            onClose={() => setShowLogOutModal(false)}
+            onConfirm={confirmLogOut}
+          />
+        )}
+        {showChangePasswordModal && (
+          <ChangePasswordModal
+            open={true}
+            onClose={() => setShowChangePasswordModal(false)}
+          />
+        )}
+        {showDeleteAccountModal && (
+          <DeleteAccountModal
+            open={true}
+            onClose={() => setShowDeleteAccountModal(false)}
+            requirePassword={session?.user?.provider === "credentials"}
+          />
+        )}
+      </>
+    );
   }
 
   return (
@@ -104,6 +143,7 @@ export function ProfileBottomSheet({
           <div className="border-t border-slate-100 dark:border-slate-800" />
           <button
             type="button"
+            onClick={openChangePassword}
             className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm text-slate-700 active:bg-slate-100 dark:text-slate-300 dark:active:bg-slate-800"
           >
             <LockIcon className="h-5 w-5 shrink-0 text-slate-400" />
@@ -112,10 +152,20 @@ export function ProfileBottomSheet({
           <div className="border-t border-slate-100 dark:border-slate-800" />
           <button
             type="button"
+            onClick={openEditProfile}
             className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm text-slate-700 active:bg-slate-100 dark:text-slate-300 dark:active:bg-slate-800"
           >
             <PencilIcon className="h-5 w-5 shrink-0 text-slate-400" />
             Edit Profile
+          </button>
+          <div className="border-t border-slate-100 dark:border-slate-800" />
+          <button
+            type="button"
+            onClick={openDeleteAccount}
+            className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm text-red-600 active:bg-red-50 dark:text-red-400 dark:active:bg-red-900/20"
+          >
+            <TrashIcon className="h-5 w-5 shrink-0" />
+            Delete Account
           </button>
           <div className="border-t border-slate-100 dark:border-slate-800" />
           <button

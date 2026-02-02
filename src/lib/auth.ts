@@ -104,8 +104,13 @@ export const authOptions: NextAuthOptions = {
       if (user?.email) {
         await connectDB();
         const dbUser = await User.findOne({ email: user.email }).lean();
-        if (dbUser) token.sub = dbUser._id.toString();
-        else token.sub = user.id;
+        if (dbUser) {
+          token.sub = dbUser._id.toString();
+          token.provider = dbUser.provider;
+        } else {
+          token.sub = user.id;
+          token.provider = "oauth";
+        }
         token.email = user.email;
       }
       if (trigger === "update" && session) {
@@ -118,6 +123,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.sub ?? "";
         session.user.email = token.email ?? undefined;
+        session.user.provider = (token.provider as "credentials" | "email" | "oauth") ?? "oauth";
       }
       return session;
     },
