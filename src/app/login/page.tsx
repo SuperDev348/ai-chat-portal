@@ -29,6 +29,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<"password" | "magiclink">("password");
   const [error, setError] = useState<string | null>(() => {
     if (errorParam === "CredentialsSignin") return "Invalid email or password.";
     if (errorParam === "SessionRequired") return "Please sign in to continue.";
@@ -42,6 +43,19 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
+      if (mode === "magiclink") {
+        const res = await signIn("email", {
+          email: email.trim(),
+          callbackUrl,
+          redirect: false,
+        });
+        if (res?.error) {
+          setError("Could not send magic link. Check that email sign-in is configured.");
+          return;
+        }
+        router.push("/login/verify");
+        return;
+      }
       const res = await signIn("credentials", {
         email,
         password,
@@ -160,14 +174,39 @@ export default function LoginPage() {
           </p>
 
           {error && (
-            <div className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+            <div className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
               {error}
             </div>
           )}
 
+          <div className="mb-4 flex rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-600 dark:bg-slate-800">
+            <button
+              type="button"
+              onClick={() => { setMode("password"); setError(null); }}
+              className={`flex-1 rounded-lg py-2 text-sm font-medium transition ${
+                mode === "password"
+                  ? "bg-white text-slate-900 shadow dark:bg-slate-700 dark:text-slate-100"
+                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+              }`}
+            >
+              Password
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode("magiclink"); setError(null); }}
+              className={`flex-1 rounded-lg py-2 text-sm font-medium transition ${
+                mode === "magiclink"
+                  ? "bg-white text-slate-900 shadow dark:bg-slate-700 dark:text-slate-100"
+                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+              }`}
+            >
+              Magic link
+            </button>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="email" className="mb-1 block text-sm font-medium text-slate-700">
+              <label htmlFor="email" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
                 Email
               </label>
               <input
@@ -178,41 +217,47 @@ export default function LoginPage() {
                 required
                 autoComplete="email"
                 placeholder="Enter Email ID"
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 placeholder-slate-400 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 placeholder-slate-400 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               />
             </div>
-            <div>
-              <label htmlFor="password" className="mb-1 block text-sm font-medium text-slate-700">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                  placeholder="Enter Password"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 pr-10 text-slate-900 placeholder-slate-400 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
-                </button>
+            {mode === "password" && (
+              <div>
+                <label htmlFor="password" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required={mode === "password"}
+                    autoComplete="current-password"
+                    placeholder="Enter Password"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 pr-10 text-slate-900 placeholder-slate-400 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-xl py-3 text-sm font-medium text-white disabled:opacity-50 cursor-pointer"
-              style={{background: '#006C67 0% 0% no-repeat padding-box', borderRadius: '50px'}}
+              className="w-full rounded-xl py-3 text-sm font-medium text-white disabled:opacity-50 cursor-pointer dark:bg-teal-600 dark:hover:bg-teal-700"
+              style={mode === "password" ? { background: "#006C67 0% 0% no-repeat padding-box", borderRadius: "50px" } : { backgroundColor: "#006C67", borderRadius: "50px" }}
             >
-              {loading ? "Signing in…" : "Login"}
+              {loading
+                ? "Please wait…"
+                : mode === "magiclink"
+                  ? "Send magic link"
+                  : "Login"}
             </button>
           </form>
 

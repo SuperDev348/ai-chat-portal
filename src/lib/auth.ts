@@ -6,14 +6,42 @@ import AppleProvider from "next-auth/providers/apple";
 import GitHubProvider from "next-auth/providers/github";
 import bcrypt from "bcryptjs";
 import { connectDB } from "@/lib/db";
+import { createNextAuthAdapter } from "@/lib/nextauth-adapter";
 import { User } from "@/lib/models/User";
 import { VerificationToken } from "@/lib/models/VerificationToken";
 
+const SESSION_MAX_AGE_SEC = 30 * 24 * 60 * 60;
+const SESSION_UPDATE_AGE_SEC = 24 * 60 * 60;
+
+function buildFromAddress(): string {
+  const email = process.env.SMTP_FROM_EMAIL ?? process.env.SMTP_USERNAME ?? "noreply@example.com";
+  const name = process.env.SMTP_FROM_NAME?.trim();
+  if (name) return `${name} <${email}>`;
+  return email;
+}
+
+function getEmailServerConfig() {
+  const host = process.env.SMTP_HOST ?? "localhost";
+  const port = parseInt(process.env.SMTP_PORT ?? "587", 10);
+  const user = process.env.SMTP_USERNAME;
+  const pass = process.env.SMTP_PASSWORD;
+  return {
+    host,
+    port,
+    secure: port === 465,
+    auth: user && pass ? { user, pass } : undefined,
+  };
+}
+
 export const authOptions: NextAuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET,
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60,
-    updateAge: 24 * 60 * 60,
+    maxAge: SESSION_MAX_AGE_SEC,
+    updateAge: SESSION_UPDATE_AGE_SEC,
+  },
+  jwt: {
+    maxAge: SESSION_MAX_AGE_SEC,
   },
   pages: {
     signIn: "/login",
@@ -42,17 +70,17 @@ export const authOptions: NextAuthOptions = {
         };
       },
     }),
-    ...(process.env.EMAIL_SERVER
+    ...(process.env.SMTP_HOST
       ? [
           EmailProvider({
-            server: process.env.EMAIL_SERVER,
-            from: process.env.EMAIL_FROM ?? "noreply@example.com",
+            server: getEmailServerConfig(),
+            from: buildFromAddress(),
             async sendVerificationRequest({ identifier, url }) {
               const { default: nodemailer } = await import("nodemailer");
-              const transport = nodemailer.createTransport(process.env.EMAIL_SERVER);
+              const transport = nodemailer.createTransport(getEmailServerConfig());
               await transport.sendMail({
                 to: identifier,
-                from: process.env.EMAIL_FROM ?? "noreply@example.com",
+                from: buildFromAddress(),
                 subject: "Sign in to AI Chat Portal",
                 text: `Open this link to sign in: ${url}`,
                 html: `<p>Open this link to sign in: <a href="${url}">${url}</a></p>`,
@@ -151,7 +179,7 @@ export const authOptions: NextAuthOptions = {
       });
     },
   },
-  adapter: undefined,
+  adapter: process.env.SMTP_HOST ? createNextAuthAdapter() : undefined,
 };
 
 export async function getVerificationTokenByToken(token: string) {
